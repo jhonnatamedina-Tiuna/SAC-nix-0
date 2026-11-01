@@ -1,0 +1,6 @@
+{
+  "summary":  "Implementation plan for the SAC Ónix-0 Tactical Command Center & C4ISR Emergency Response Platform for Grupo de Rescate Tiuna. Includes C4ISR console layout, SAC 01-99 mineral matrix, PostGIS tactical dispatch, dynamic PTT state machine, network defense & firewall quarantine, tactical Telegram bot terminal, offline burst engine, and Web Audio/Speech synthesis.",
+  "updatedAt":  "2026-11-01T22:26:08.729206909Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

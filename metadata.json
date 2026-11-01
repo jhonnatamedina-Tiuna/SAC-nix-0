@@ -1,0 +1,6 @@
+{
+  "name": "SAC Ónix-0 · Consola C4ISR de Rescate Tiuna",
+  "description": "Estación táctica C4ISR para el Grupo de Rescate Tiuna con Matriz Operativa SAC 01-99, despacho espacial PostGIS, máquina de estados PTT, defensa de red mallada y sincronización offline.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
