@@ -1,252 +1,50 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "project": {
-    "name": "sistema-onix0-rescate-tiuna",
-    "display_name": "Ónix-0 C4ISR - Grupo de Rescate Tiuna",
-    "version": "2.4.0",
-    "build_revision": "2026.04-PROD",
-    "codename": "CARACAS-AVILA-DEFENSE",
-    "security_level": "RESTRICTED-TACTICAL-LEVEL-4",
-    "description": "Ecosistema táctico unificado multiplataforma: Servidor Central Ónix-0, Estación Táctica Windows, y Clientes de Campo Android/iOS con cifrado SQLCipher, cartografía offline .mbtiles, matriz mineral SAC 01-99 y defensa perimetral iptables."
-  },
-  "global_security": {
-    "sac_mineral_matrix_version": "2026.1",
-    "cipher_standard": "AES-256-GCM / PBKDF2-HMAC-SHA512 (100,000 iter)",
-    "firewall": {
-      "threshold_failed_attempts": 5,
-      "lockout_penalty_hours": 24,
-      "chain_name": "TIUNA-FIREWALL",
-      "auto_drop_signal": "NX-93",
-      "intrusion_signal": "NX-92"
+    "proyecto": "Sistema Alfanumérico de Comunicaciones (SAC) - Ónix-0",
+    "institucion": "Grupo de Rescate Tiuna",
+    "version": "1.0.0",
+    "plataformas": {
+        "linux_servidor": {
+            "componentes": [
+                "FastAPI",
+                "PostgreSQL",
+                "PostGIS",
+                "iptables",
+                "Telegram Bot",
+                "APScheduler"
+            ],
+            "instalador": "install.sh",
+            "servicio": "onix0.service"
+        },
+        "windows_standalone": {
+            "componentes": [
+                "Consola C4ISR de Escritorio"
+            ],
+            "compilador": "PyInstaller"
+        },
+        "android_cliente": {
+            "componentes": [
+                "App Móvil",
+                "SQLCipher",
+                "Mapas .mbtiles",
+                "TTS Táctico",
+                "PTT Bluetooth"
+            ],
+            "framework": "React Native / Expo"
+        },
+        "ios_cliente": {
+            "componentes": [
+                "App Móvil",
+                "SQLCipher",
+                "Mapas .mbtiles",
+                "TTS Táctico",
+                "PTT Bluetooth"
+            ],
+            "framework": "React Native / Expo"
+        }
     },
-    "institutional_whitelists": [
-      { "ip": "127.0.0.1/32", "desc": "Loopback Host Ónix-0" },
-      { "ip": "10.42.0.0/24", "desc": "Segmento Comando Central Ónix Base" },
-      { "ip": "10.42.10.0/23", "desc": "Ambulancias Cobalto y Unidades de Terreno" },
-      { "ip": "192.168.100.0/24", "desc": "Enlaces Troncales Mesh y Repetidores Ávila" }
-    ],
-    "protected_node_ips": [
-      "127.0.0.1",
-      "10.42.0.1",
-      "10.42.10.10",
-      "10.42.10.11"
-    ]
-  },
-  "platforms": {
-    "linux_server": {
-      "target_id": "linux-onix0-server",
-      "environment": "Ubuntu 22.04 LTS / Debian 12 Bookworm (x86_64 / arm64)",
-      "runtime": {
-        "python": ">=3.11.8",
-        "nodejs": ">=20.12.0",
-        "postgresql": ">=15.4",
-        "postgis": ">=3.3.3"
-      },
-      "system_services": {
-        "systemd_unit": "onix0-backend.service",
-        "service_path": "/etc/systemd/system/onix0-backend.service",
-        "exec_start": "/opt/onix0-server/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4",
-        "restart_policy": "always",
-        "security_profile": "NoNewPrivileges=true, ProtectSystem=strict, PrivateTmp=true"
-      },
-      "dependencies": {
-        "apt": [
-          "python3-venv",
-          "python3-dev",
-          "build-essential",
-          "libpq-dev",
-          "postgresql-15",
-          "postgresql-15-postgis-3",
-          "iptables-persistent",
-          "net-tools",
-          "sqlite3",
-          "libsqlcipher-dev",
-          "gnupg2",
-          "nginx"
-        ],
-        "pip": [
-          "fastapi==0.110.0",
-          "uvicorn[standard]==0.29.0",
-          "psycopg2-binary==2.9.9",
-          "asyncpg==0.29.0",
-          "pydantic-settings==2.2.1",
-          "pyjwt==2.8.0",
-          "python-telegram-bot==21.0.1",
-          "apscheduler==3.10.4",
-          "pysqlcipher3==1.2.0"
-        ]
-      },
-      "security_and_firewall_commands": {
-        "chain_creation": "iptables -N TIUNA-FIREWALL 2>/dev/null || true",
-        "chain_link": "iptables -C INPUT -j TIUNA-FIREWALL 2>/dev/null || iptables -I INPUT 1 -j TIUNA-FIREWALL",
-        "ban_command_template": "iptables -I TIUNA-FIREWALL 1 -s {ip} -j DROP -m comment --comment 'TIUNA-AUTO-BAN-5-FAILURES'",
-        "unban_command_template": "iptables -D TIUNA-FIREWALL -s {ip} -j DROP",
-        "persist_rules": "netfilter-persistent save",
-        "audit_query": "SELECT ip_origen, COUNT(*) as fallos FROM auditoria_intentos_no_autorizados WHERE timestamp_intento > NOW() - INTERVAL '1 hour' GROUP BY ip_origen HAVING COUNT(*) >= 5;"
-      },
-      "build_and_deploy_steps": [
-        "sudo apt-get update && sudo apt-get install -y <apt_dependencies>",
-        "python3 -m venv /opt/onix0-server/venv",
-        "/opt/onix0-server/venv/bin/pip install --upgrade pip",
-        "/opt/onix0-server/venv/bin/pip install -r requirements.txt",
-        "sudo -u postgres psql -f init.sql",
-        "sudo cp deploy/linux/onix0-backend.service /etc/systemd/system/",
-        "sudo systemctl daemon-reload && sudo systemctl enable --now onix0-backend.service",
-        "sudo bash deploy/linux/init_firewall.sh"
-      ]
-    },
-    "windows_workstation": {
-      "target_id": "windows-onix0-workstation",
-      "environment": "Microsoft Windows 10 / 11 / Server 2022 (x64)",
-      "runtime": {
-        "python": "3.11.8 (64-bit)",
-        "compiler": "MSVC v143 / Visual C++ 2015-2022 Redistributable",
-        "engine": "PyInstaller 6.5.0 Standalone Executable"
-      },
-      "target_binary": {
-        "name": "Onix0_Tactical_Station.exe",
-        "mode": "onefile",
-        "windowed": true,
-        "icon": "public/assets/aistudio/Tiuna_Capital_Nativo_1920_8bfdc104.png",
-        "uac_admin": true
-      },
-      "dependencies": {
-        "pip": [
-          "pyinstaller==6.5.0",
-          "fastapi==0.110.0",
-          "uvicorn==0.29.0",
-          "psycopg2-binary==2.9.9",
-          "pywin32==306",
-          "pysqlcipher3-binary==1.0.4",
-          "pyttsx3==2.90",
-          "pydantic-settings==2.2.1"
-        ],
-        "native_dlls": [
-          "sqlcipher.dll",
-          "libcrypto-3-x64.dll",
-          "vcruntime140.dll"
-        ]
-      },
-      "security_and_firewall_commands": {
-        "windows_firewall_ban_template": "netsh advfirewall firewall add rule name=\"TIUNA_BAN_{ip}\" dir=in action=block remoteip={ip}",
-        "windows_firewall_unban_template": "netsh advfirewall firewall delete rule name=\"TIUNA_BAN_{ip}\"",
-        "integrity_hash": "CertUtil -hashfile dist\\Onix0_Tactical_Station.exe SHA256"
-      },
-      "build_and_deploy_steps": [
-        "python -m venv venv_win",
-        ".\\venv_win\\Scripts\\activate",
-        "pip install -r requirements_windows.txt",
-        "pyinstaller --noconfirm --log-level=WARN deploy/windows/onix0_windows.spec",
-        "CertUtil -hashfile dist\\Onix0_Tactical_Station.exe SHA256 > dist\\checksum_sha256.txt"
-      ]
-    },
-    "android_client": {
-      "target_id": "android-onix0-tactical",
-      "environment": "Android 5.0 (API 21 / Lollipop) hasta Android 14+ (API 34)",
-      "framework": "React Native 0.74.x / Expo SDK 51 Bare Workflow",
-      "hardware_profile": "Optimizado para teléfonos de bajos recursos (RAM 1GB-2GB, CPU Quad-Core 1.3GHz, Cero Lag)",
-      "package_name": "org.rescatetiuna.onix0.tactical",
-      "build_types": {
-        "apk_debug": "app-debug.apk (Pruebas en malla RF)",
-        "apk_release": "app-release-unsigned.apk / app-tactical-aligned.apk",
-        "aab": "app-release.aab (Play Store opcional)"
-      },
-      "offline_storage": {
-        "engine": "SQLCipher v4 (256-bit AES GCM)",
-        "native_driver": "@journeyapps/react-native-quick-sqlite",
-        "db_filename": "tiuna_tactical_vault.enc",
-        "kdf_iterations": 100000,
-        "page_size": 4096,
-        "burst_sync_table": "cola_rafaga_tactica"
-      },
-      "offline_cartography": {
-        "format": ".mbtiles (Raster/Vector MBTiles via SQLite)",
-        "storage_path": "/sdcard/Android/data/org.rescatetiuna.onix0.tactical/files/maps/caracas_avila.mbtiles",
-        "fallback_bundling": "assets/maps/avila_lite_z10_z16.mbtiles"
-      },
-      "tactical_tts": {
-        "engine": "Android TextToSpeech (android.speech.tts.TextToSpeech)",
-        "voice_gender": "male",
-        "voice_accent": "es-419 (Neutral Latin America / es_VE / es_MX)",
-        "pitch": 0.84,
-        "rate": 0.98,
-        "phonetic_mapping": "SAC 01-99 Mineral Dict (QZ, GR, AM, DM, CB, NX)"
-      },
-      "dependencies": {
-        "npm": [
-          "react-native@0.74.1",
-          "@journeyapps/react-native-quick-sqlite@^3.2.0",
-          "@rnmapbox/maps@^10.1.24",
-          "react-native-tts@^4.1.1",
-          "react-native-sound@^0.11.2",
-          "react-native-fs@^2.20.0",
-          "react-native-keychain@^8.2.0",
-          "lucide-react-native@^0.368.0"
-        ]
-      },
-      "build_and_deploy_steps": [
-        "npm install",
-        "cd android",
-        "./gradlew clean",
-        "./gradlew assembleRelease -Pandroid.injected.signing.store.file=tiuna-release.keystore",
-        "zipalign -v -p 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/tiuna-onix0-v2.4.0.apk"
-      ]
-    },
-    "ios_client": {
-      "target_id": "ios-onix0-tactical",
-      "environment": "iOS 15.0+ (iPhone 7 hasta iPhone 16 Pro / iPadOS)",
-      "framework": "React Native 0.74.x / CocoaPods",
-      "bundle_identifier": "org.rescatetiuna.onix0.tactical",
-      "security_profile": "Secure Enclave Keychain + SQLCipher 256-bit",
-      "offline_storage": {
-        "engine": "SQLCipher CocoaPod / GRDB.swift encrypted",
-        "key_storage": "iOS Keychain with kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly"
-      },
-      "offline_cartography": {
-        "format": ".mbtiles",
-        "rendering": "MapLibre Native iOS / MGLTilePyramidOfflineRegion",
-        "storage_directory": "Library/Application Support/Maps/caracas_avila.mbtiles"
-      },
-      "tactical_tts": {
-        "framework": "AVFoundation / AVSpeechSynthesizer",
-        "voice_gender": "male",
-        "voice_identifier": "com.apple.ttsbundle.Jorge-compact (es-MX / es-419 Neutro)",
-        "pitch": 0.86,
-        "rate": 0.98,
-        "audio_session": "AVAudioSessionCategoryPlayback with AVAudioSessionCategoryOptionDuckOthers"
-      },
-      "dependencies": {
-        "cocoapods": [
-          "SQLCipher (~> 4.5.5)",
-          "MapLibre (~> 5.13.0)"
-        ],
-        "npm": [
-          "react-native@0.74.1",
-          "react-native-keychain@^8.2.0",
-          "react-native-sound@^0.11.2"
-        ]
-      },
-      "build_and_deploy_steps": [
-        "npm install",
-        "cd ios && pod install --repo-update",
-        "xcodebuild -workspace Onix0Tactical.xcworkspace -scheme Onix0Tactical -configuration Release -archivePath build/Onix0Tactical.xcarchive archive",
-        "xcodebuild -exportArchive -archivePath build/Onix0Tactical.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath dist/ipa"
-      ]
+    "scripts_generados": {
+        "install.sh": "Script automatizado para despliegue en Linux",
+        "Makefile": "Automatizador universal de tareas y compilación",
+        "backup_onix0.sh": "Respaldo diario cifrado con GPG"
     }
-  },
-  "deployment_pipeline": {
-    "orchestrator": "Makefile (GNU Make 4.3+)",
-    "artifacts_output_dir": "./build_artifacts",
-    "supported_targets": [
-      "all",
-      "build-linux",
-      "build-windows",
-      "build-android-apk",
-      "build-ios-ipa",
-      "verify-manifest",
-      "deploy-server",
-      "firewall-selftest",
-      "clean"
-    ]
-  }
 }
