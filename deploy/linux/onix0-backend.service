@@ -1,0 +1,29 @@
+[Unit]
+Description=Servidor Central Ónix-0 - Grupo de Rescate Tiuna (C4ISR Backend)
+Documentation=https://github.com/rescatetiuna/sac-onix0
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/onix0-server
+Environment="DATABASE_URL=postgresql://tiuna_admin:ClaveMaestraPostgresSuperSegura2026!@localhost:5432/onix0_central_db"
+Environment="JWT_SECRET_KEY=ONIX0_TIUNA_TACTICAL_SECRET_2026_SECURE"
+Environment="MAPS_DIRECTORY=/opt/onix0-server/storage/maps"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/opt/onix0-server/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+Restart=always
+RestartSec=3s
+LimitNOFILE=65535
+
+# Endurecimiento del Proceso (Hardening)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/onix0-server/storage
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

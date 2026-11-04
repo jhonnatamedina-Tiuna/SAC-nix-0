@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BlockedIp, AuditAttempt } from '../types/tactical';
 import { REDES_PERMITIDAS_CONFIG, LISTA_BLANCA_PROTEGIDA, IPS_BLOQUEADAS_INICIALES, AUDITORIA_INICIAL } from '../data/networkRules';
 import { tacticalAudio } from '../utils/audio';
-import { Shield, ShieldAlert, ShieldCheck, Lock, Unlock, AlertTriangle, Terminal, Play, RotateCcw, Activity } from 'lucide-react';
+import { persistirAuditoriaFirestore, suscribirAuditoriaEnTiempoReal } from '../services/firestoreService';
+import { Shield, ShieldAlert, ShieldCheck, Lock, Unlock, AlertTriangle, Terminal, Play, RotateCcw, Activity, Cloud } from 'lucide-react';
 
 interface CyberDefensePanelProps {
   ipsBloqueadas: BlockedIp[];
@@ -20,6 +21,22 @@ export const CyberDefensePanel: React.FC<CyberDefensePanelProps> = ({
   const [conteoPrueba, setConteoPrueba] = useState<number>(3);
   const [motivoPrueba, setMotivoPrueba] = useState<string>('Token JWT inválido (Firma no fidedigna)');
   const [logMensaje, setLogMensaje] = useState<string | null>(null);
+  const [cloudConectado, setCloudConectado] = useState<boolean>(true);
+
+  // Suscripción en tiempo real a Firebase Firestore
+  useEffect(() => {
+    const desuscribir = suscribirAuditoriaEnTiempoReal((intentosCloud) => {
+      setAuditoria(prev => {
+        // Combinar manteniendo únicos por id o timestamp
+        const ids = new Set(intentosCloud.map(i => i.id));
+        const locales = prev.filter(p => !ids.has(p.id));
+        return [...intentosCloud, ...locales].slice(0, 30);
+      });
+      setCloudConectado(true);
+    });
+
+    return () => desuscribir();
+  }, []);
 
   // Desbloqueo de IP (iptables -D)
   const handleDesbloquear = (ip: string) => {
@@ -39,7 +56,7 @@ export const CyberDefensePanel: React.FC<CyberDefensePanelProps> = ({
     const nuevoConteo = conteoPrueba + 1;
     setConteoPrueba(nuevoConteo);
 
-    // Agregar registro de auditoría
+    // Agregar registro de auditoría local y en Firestore
     const nuevoIntento: AuditAttempt = {
       id: Date.now(),
       ipOrigen: ipPrueba,
@@ -50,6 +67,9 @@ export const CyberDefensePanel: React.FC<CyberDefensePanelProps> = ({
       timestamp: new Date().toISOString()
     };
     setAuditoria(prev => [nuevoIntento, ...prev.slice(0, 19)]);
+
+    // Persistencia asíncrona en la nube (Firestore)
+    persistirAuditoriaFirestore(nuevoIntento).catch(() => {});
 
     if (nuevoConteo >= 5) {
       // Superó umbral de 5: TRIGGER trg_verificar_umbral_fallos activa bloqueo en iptables
@@ -69,14 +89,14 @@ export const CyberDefensePanel: React.FC<CyberDefensePanelProps> = ({
         setLogMensaje(`🚨 [FIREWALL KERNEL] Regla DROP aplicada automáticamente a IP: ${ipPrueba} tras 5 intentos fallidos.`);
       }
     } else {
-      setLogMensaje(`[AUDITORÍA] Intento fallido registrado para ${ipPrueba}. Total en ventana: ${nuevoConteo}/5.`);
+      setLogMensaje(`[AUDITORÍA CLOUD] Intento fallido registrado para ${ipPrueba} y guardado en Firestore. Total en ventana: ${nuevoConteo}/5.`);
     }
   };
 
   return (
     <div className="bg-[#0f172a] rounded-xl border border-slate-800 flex flex-col h-full overflow-hidden shadow-2xl">
       {/* Encabezado */}
-      <div className="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+      <div className="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-amber-400" />
           <h2 className="text-sm font-bold text-white tracking-wide uppercase">
@@ -84,9 +104,13 @@ export const CyberDefensePanel: React.FC<CyberDefensePanelProps> = ({
           </h2>
         </div>
         <div className="flex items-center gap-2 text-xs font-mono">
-          <span className="text-slate-400">Umbral de Aislamiento:</span>
+          <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 font-bold rounded border border-blue-500/30 flex items-center gap-1.5">
+            <Cloud className="w-3.5 h-3.5 text-blue-400" />
+            <span>Firestore Sync (/auditoria_seguridad)</span>
+          </span>
+          <span className="text-slate-400">·</span>
           <span className="px-2 py-0.5 bg-red-500/20 text-red-300 font-bold rounded border border-red-500/30">
-            5 Fallos / 15 min
+            Umbral: 5 Fallos / 15 min
           </span>
         </div>
       </div>

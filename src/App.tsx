@@ -15,14 +15,30 @@ import { TelegramConsole } from './components/TelegramConsole';
 import { MobileTerminalSim } from './components/MobileTerminalSim';
 import { BackendCodeViewer } from './components/BackendCodeViewer';
 import { EmergencyAlertBanner } from './components/EmergencyAlertBanner';
+import { DispatchAnalyticsPanel } from './components/DispatchAnalyticsPanel';
+import { VoluntarioMobileTerminal } from './components/VoluntarioMobileTerminal';
+import { PWAInstallButton } from './components/PWAInstallButton';
+import { TacticalBootScreen } from './components/TacticalBootScreen';
+import { GoogleDrivePanel } from './components/GoogleDrivePanel';
+
+// Firebase Client & Services
+import './lib/firebase';
+import { persistirLogSistemaFirestore } from './services/firestoreService';
 
 // Iconos
-import { Map, Shield, Radio, Terminal, Smartphone, FileCode, AlertTriangle, Activity, Bell } from 'lucide-react';
+import { Map, Shield, Radio, Terminal, Smartphone, FileCode, AlertTriangle, Activity, Bell, BarChart3, Cloud, HardDrive } from 'lucide-react';
 
-type TabView = 'C4ISR_CONSOLA' | 'MATRIZ_SAC' | 'RADIO_PTT' | 'CIBERDEFENSA' | 'TELEGRAM_BOT' | 'TERMINAL_MOVIL' | 'SCRIPTS_BACKEND';
+type TabView = 'C4ISR_CONSOLA' | 'ANALITICA_DESPACHO' | 'APP_VOLUNTARIOS' | 'MATRIZ_SAC' | 'RADIO_PTT' | 'GOOGLE_DRIVE' | 'CIBERDEFENSA' | 'TELEGRAM_BOT' | 'TERMINAL_MOVIL' | 'SCRIPTS_BACKEND';
 
 export default function App() {
   const [tabActiva, setTabActiva] = useState<TabView>('C4ISR_CONSOLA');
+  const [mostrarBootScreen, setMostrarBootScreen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('tiuna_skip_boot') !== 'true';
+    } catch {
+      return true;
+    }
+  });
   const [unidades, setUnidades] = useState<TacticalUnit[]>(UNIDADES_INICIALES);
   const [canalPttActivo, setCanalPttActivo] = useState<PttChannelInfo>(CANALES_PTT_DISPONIBLES[0]);
   const [ipsBloqueadas, setIpsBloqueadas] = useState<BlockedIp[]>(IPS_BLOQUEADAS_INICIALES);
@@ -49,6 +65,16 @@ export default function App() {
 
   // Manejar transmisión de clave SAC desde cualquier panel
   const handleTransmitirClave = (c: SacCode) => {
+    // Persistir log del sistema en Firebase Firestore
+    persistirLogSistemaFirestore({
+      id: crypto.randomUUID(),
+      tipo: 'SAC_TRANSMISION',
+      unidad: 'Cobalto-1',
+      mensaje: `Transmisión SAC: [${c.codigo}] ${c.descripcion}`,
+      nivel: c.prioridad === 1 ? 'CRITICO' : 'INFO',
+      timestamp: new Date().toISOString()
+    }).catch(() => {});
+
     // Si la clave es de Cobalto (CB-80..86), conmutar canal PTT y actualizar estado de Cobalto-1
     if (c.cambioCanalPtt && MAPEO_CANALES_PTT[c.codigo]) {
       const mapeo = MAPEO_CANALES_PTT[c.codigo];
@@ -114,6 +140,16 @@ export default function App() {
     destinoLat: number,
     destinoLon: number
   ) => {
+    // Persistir log de despacho en Firestore
+    persistirLogSistemaFirestore({
+      id: crypto.randomUUID(),
+      tipo: 'DESPACHO_UNIDAD',
+      unidad: indicativo,
+      mensaje: `Despacho de ${indicativo} con estado ${nuevoEstado} hacia coordenadas (${destinoLat}, ${destinoLon})`,
+      nivel: 'INFO',
+      timestamp: new Date().toISOString()
+    }).catch(() => {});
+
     setUnidades(prev =>
       prev.map(u => {
         if (u.indicativo === indicativo) {
@@ -154,6 +190,16 @@ export default function App() {
 
   // Notificación de Firewall Drop tras 5 fallos
   const handleAlertaDrop = (ip: string, motivo: string, fallos: number) => {
+    // Persistir log de ciberseguridad en Firestore
+    persistirLogSistemaFirestore({
+      id: crypto.randomUUID(),
+      tipo: 'FIREWALL_DROP',
+      unidad: 'Kernel iptables',
+      mensaje: `Aislamiento DROP aplicado a IP: ${ip} por exceder 5 fallos (${motivo})`,
+      nivel: 'WARN',
+      timestamp: new Date().toISOString()
+    }).catch(() => {});
+
     const dropMsg: TelegramMessage = {
       id: crypto.randomUUID(),
       remitente: 'BOT_TIUNA',
@@ -174,10 +220,27 @@ export default function App() {
   const handleDesbloquearIp = (ip: string) => {
     setIpsBloqueadas(prev => prev.filter(item => item.ip !== ip));
     tacticalAudio.playRogerBeep();
+    persistirLogSistemaFirestore({
+      id: crypto.randomUUID(),
+      tipo: 'FIREWALL_UNBLOCK',
+      unidad: 'Ónix-0 Admin',
+      mensaje: `Desbloqueo de IP: ${ip} levantada de la regla DROP.`,
+      nivel: 'INFO',
+      timestamp: new Date().toISOString()
+    }).catch(() => {});
   };
 
   // Procesar ráfaga offline entregada a Ónix-0
   const handleSyncRafaga = (paquetes: OfflineQueueItem[]) => {
+    persistirLogSistemaFirestore({
+      id: crypto.randomUUID(),
+      tipo: 'SYNC_RAFAGA',
+      unidad: paquetes[0]?.unidadId || 'Terreno',
+      mensaje: `Ráfaga sincronizada con ${paquetes.length} paquetes offline.`,
+      nivel: 'INFO',
+      timestamp: new Date().toISOString()
+    }).catch(() => {});
+
     const syncMsg: TelegramMessage = {
       id: crypto.randomUUID(),
       remitente: 'BOT_TIUNA',
@@ -193,9 +256,17 @@ export default function App() {
       {/* ============================================================== */}
       {/* STRICT TOP BAR CONTRACT (§2): 3 Zones separated by gap-8       */}
       {/* ============================================================== */}
-      <header className="flex items-center justify-between gap-8 px-6 py-3.5 bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
-        {/* Zona 1: Wordmark limpio en una sola línea */}
-        <div className="flex items-center gap-2 whitespace-nowrap shrink-0">
+      <header 
+        style={{ backgroundColor: '#090d16', zIndex: 100 }}
+        className="flex items-center justify-between gap-8 px-6 py-3.5 border-b border-slate-800 sticky top-0 shadow-2xl bg-[#090d16] backdrop-blur-none"
+      >
+        {/* Zona 1: Wordmark limpio con insignia oficial institucional */}
+        <div className="flex items-center gap-2.5 whitespace-nowrap shrink-0">
+          <img
+            src="/assets/aistudio/Tiuna_Capital_Nativo_1920_8bfdc104.png"
+            alt="Insignia Fundación de Rescate Tiuna"
+            className="w-8 h-8 rounded-full object-contain border border-amber-500/50 bg-slate-950 p-0.5 shadow-sm"
+          />
           <span className="text-base font-bold tracking-tight text-white font-mono">
             Ónix-0 · Rescate Tiuna
           </span>
@@ -204,7 +275,7 @@ export default function App() {
         </div>
 
         {/* Zona 2: Enlaces de navegación táctica concisos */}
-        <nav className="hidden lg:flex items-center gap-6 text-xs font-medium text-slate-400">
+        <nav className="hidden lg:flex items-center gap-5 text-xs font-medium text-slate-400">
           <button
             onClick={() => setTabActiva('C4ISR_CONSOLA')}
             className={`transition-colors whitespace-nowrap shrink-0 ${
@@ -212,6 +283,23 @@ export default function App() {
             }`}
           >
             Consola C4ISR
+          </button>
+          <button
+            onClick={() => setTabActiva('APP_VOLUNTARIOS')}
+            className={`transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+              tabActiva === 'APP_VOLUNTARIOS' ? 'text-amber-400 font-bold border-b border-amber-400 pb-0.5' : 'hover:text-slate-200'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+            <span>App Voluntario</span>
+          </button>
+          <button
+            onClick={() => setTabActiva('ANALITICA_DESPACHO')}
+            className={`transition-colors whitespace-nowrap shrink-0 ${
+              tabActiva === 'ANALITICA_DESPACHO' ? 'text-amber-400 font-bold border-b border-amber-400 pb-0.5' : 'hover:text-slate-200'
+            }`}
+          >
+            Analítica 24h
           </button>
           <button
             onClick={() => setTabActiva('MATRIZ_SAC')}
@@ -228,6 +316,15 @@ export default function App() {
             }`}
           >
             Radio PTT
+          </button>
+          <button
+            onClick={() => setTabActiva('GOOGLE_DRIVE')}
+            className={`transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+              tabActiva === 'GOOGLE_DRIVE' ? 'text-amber-400 font-bold border-b border-amber-400 pb-0.5' : 'hover:text-slate-200'
+            }`}
+          >
+            <HardDrive className="w-3.5 h-3.5 text-blue-400" />
+            <span>Google Drive</span>
           </button>
           <button
             onClick={() => setTabActiva('CIBERDEFENSA')}
@@ -263,8 +360,9 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Zona 3: 1 Acción Primaria */}
+        {/* Zona 3: Acciones primarias y botón de instalación nativo */}
         <div className="flex items-center gap-3 shrink-0">
+          <PWAInstallButton />
           <button
             onClick={() => {
               const sacQz18 = SAC_MATRIX.find(c => c.codigo === 'QZ-18');
@@ -274,17 +372,23 @@ export default function App() {
             }}
             className="px-3.5 py-1.5 text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors whitespace-nowrap shrink-0 font-mono shadow-md shadow-amber-500/20"
           >
-            Alerta General QZ-18
+            Alerta QZ-18
           </button>
         </div>
       </header>
 
       {/* Selector móvil de vistas (en pantallas estrechas) */}
-      <div className="lg:hidden bg-slate-950 border-b border-slate-800 px-4 py-2 flex items-center gap-2 overflow-x-auto scrollbar-none text-xs">
+      <div 
+        style={{ backgroundColor: '#090d16', zIndex: 99 }}
+        className="lg:hidden border-b border-slate-800 px-4 py-2 flex items-center gap-2 overflow-x-auto scrollbar-none text-xs bg-[#090d16] sticky top-[61px] shadow-md"
+      >
         {[
+          { id: 'APP_VOLUNTARIOS', label: '📱 App Voluntario' },
           { id: 'C4ISR_CONSOLA', label: 'C4ISR' },
+          { id: 'ANALITICA_DESPACHO', label: 'Analítica 24h' },
           { id: 'MATRIZ_SAC', label: 'SAC 01-99' },
           { id: 'RADIO_PTT', label: 'Radio PTT' },
+          { id: 'GOOGLE_DRIVE', label: '💾 Google Drive' },
           { id: 'CIBERDEFENSA', label: 'Firewall' },
           { id: 'TELEGRAM_BOT', label: 'Telegram' },
           { id: 'TERMINAL_MOVIL', label: 'Motor Offline' },
@@ -396,6 +500,39 @@ export default function App() {
           </div>
         )}
 
+        {/* Vista: App Móvil para Voluntarios de Campo (Gama Baja Android e iOS) */}
+        {tabActiva === 'APP_VOLUNTARIOS' && (
+          <div className="pb-8">
+            <VoluntarioMobileTerminal
+              onTransmitirClave={handleTransmitirClave}
+              onSyncRafaga={(items) => {
+                handleSyncRafaga(
+                  items.map(it => ({
+                    idPaquete: it.id,
+                    unidadId: it.unidadId,
+                    tipoEvento: it.codigoSac,
+                    prioridad: it.prioridad,
+                    fechaOffline: it.timestamp,
+                    datos: {
+                      latitud: it.latitud,
+                      longitud: it.longitud,
+                      descripcion: it.descripcion
+                    },
+                    estado: 'SINCRONIZADO' as const
+                  }))
+                );
+              }}
+            />
+          </div>
+        )}
+
+        {/* Vista: Analítica de Despacho 24h (Recharts) */}
+        {tabActiva === 'ANALITICA_DESPACHO' && (
+          <div className="h-[750px]">
+            <DispatchAnalyticsPanel unidades={unidades} />
+          </div>
+        )}
+
         {/* Vista 2: Matriz SAC 01-99 Completa */}
         {tabActiva === 'MATRIZ_SAC' && (
           <div className="h-[800px]">
@@ -411,6 +548,24 @@ export default function App() {
               onCambiarCanal={setCanalPttActivo}
               unidadVinculada="Cobalto-1"
               estadoCobaltoActual={unidades.find(u => u.indicativo === 'Cobalto-1')?.estadoSac || 'CB-80'}
+            />
+          </div>
+        )}
+
+        {/* Vista: Google Drive Táctico */}
+        {tabActiva === 'GOOGLE_DRIVE' && (
+          <div className="h-[750px]">
+            <GoogleDrivePanel
+              onNotificarTelegram={(texto) => {
+                const msg: TelegramMessage = {
+                  id: crypto.randomUUID(),
+                  remitente: 'BOT_TIUNA',
+                  texto,
+                  timestamp: new Date().toLocaleTimeString(),
+                  tipo: 'INFO'
+                };
+                setMensajesTelegram(prev => [...prev, msg]);
+              }}
             />
           </div>
         )}
@@ -456,15 +611,37 @@ export default function App() {
 
       {/* Pie de página con sello institucional del Grupo Tiuna */}
       <footer className="px-6 py-4 bg-slate-950 border-t border-slate-900 text-xs text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span>Estación Ónix-0 · Grupo de Rescate Tiuna</span>
+        <div className="flex items-center gap-2.5">
+          <img
+            src="/assets/aistudio/Tiuna_Capital_Nativo_1920_8bfdc104.png"
+            alt="Logo Fundación de Rescate Tiuna"
+            className="w-6 h-6 rounded-full object-contain border border-slate-800"
+          />
+          <span className="text-slate-300 font-bold">Fundación de Rescate Tiuna · Región Capital</span>
           <span className="text-slate-700">·</span>
           <span>SAR & Emergencias Prehospitalarias</span>
         </div>
-        <div>
-          <span>Matriz SAC v2.4 (Minerales QZ·GR·AM·DM·CB·NX)</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              tacticalAudio.playRogerBeep();
+              setMostrarBootScreen(true);
+            }}
+            className="text-[11px] text-amber-400/90 hover:text-amber-300 flex items-center gap-1 transition-colors px-2 py-0.5 rounded bg-slate-900 border border-slate-800 hover:border-amber-500/40"
+            title="Reiniciar la secuencia táctica de arranque"
+          >
+            <Activity className="w-3 h-3 text-amber-400" />
+            <span>Bootscreen</span>
+          </button>
+          <span className="text-slate-700">·</span>
+          <span>Matriz SAC v2.4 (QZ·GR·AM·DM·CB·NX)</span>
         </div>
       </footer>
+
+      {/* Bootscreen Táctico de Inicialización (Splash) */}
+      {mostrarBootScreen && (
+        <TacticalBootScreen onComplete={() => setMostrarBootScreen(false)} />
+      )}
     </div>
   );
 }

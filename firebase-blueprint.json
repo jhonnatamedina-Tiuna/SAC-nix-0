@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "Despacho": {
+      "title": "Despacho",
+      "description": "Registro de despacho de unidades de emergencia con tiempos de respuesta.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "indicativo": { "type": "string", "maxLength": 50 },
+        "tipoUnidad": { "type": "string", "maxLength": 30 },
+        "claveSac": { "type": "string", "maxLength": 10 },
+        "sector": { "type": "string", "maxLength": 100 },
+        "tiempoRespuestaMin": { "type": "number" },
+        "prioridad": { "type": "number" },
+        "timestamp": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "indicativo", "claveSac", "tiempoRespuestaMin", "prioridad", "timestamp"]
+    },
+    "EventoRegistro": {
+      "title": "EventoRegistro",
+      "description": "Registro de eventos e incidencias de campo con claves SAC.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "codigoSac": { "type": "string", "maxLength": 10 },
+        "mineral": { "type": "string", "maxLength": 20 },
+        "unidadId": { "type": "string", "maxLength": 50 },
+        "descripcion": { "type": "string", "maxLength": 255 },
+        "timestamp": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "codigoSac", "mineral", "unidadId", "timestamp"]
+    },
+    "AuditoriaSeguridad": {
+      "title": "AuditoriaSeguridad",
+      "description": "Auditoría en tiempo real de intentos no autorizados y eventos de ciberdefensa.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "ipOrigen": { "type": "string", "maxLength": 45 },
+        "endpoint": { "type": "string", "maxLength": 120 },
+        "metodo": { "type": "string", "maxLength": 10 },
+        "motivo": { "type": "string", "maxLength": 255 },
+        "userAgent": { "type": "string", "maxLength": 255 },
+        "timestamp": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "ipOrigen", "endpoint", "metodo", "motivo", "timestamp"]
+    },
+    "LogSistema": {
+      "title": "LogSistema",
+      "description": "Logs operacionales y registros de eventos en tiempo real de la estación Ónix-0.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "tipo": { "type": "string", "maxLength": 30 },
+        "unidad": { "type": "string", "maxLength": 50 },
+        "mensaje": { "type": "string", "maxLength": 500 },
+        "nivel": { "type": "string", "maxLength": 20 },
+        "timestamp": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "tipo", "mensaje", "nivel", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/despachos/{despachoId}": {
+      "schema": { "$ref": "#/entities/Despacho" },
+      "description": "Colección de registros de despacho de ambulancias y unidades tácticas."
+    },
+    "/eventos_sac/{eventoId}": {
+      "schema": { "$ref": "#/entities/EventoRegistro" },
+      "description": "Colección de eventos e informes SAC de las últimas 24 horas."
+    },
+    "/auditoria_seguridad/{auditoriaId}": {
+      "schema": { "$ref": "#/entities/AuditoriaSeguridad" },
+      "description": "Colección de auditoría en tiempo real para eventos de red y firewall."
+    },
+    "/logs_sistema/{logId}": {
+      "schema": { "$ref": "#/entities/LogSistema" },
+      "description": "Colección persistente de logs operacionales del sistema central."
+    }
+  }
+}

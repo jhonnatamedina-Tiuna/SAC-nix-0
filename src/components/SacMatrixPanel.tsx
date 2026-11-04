@@ -66,8 +66,18 @@ export const SacMatrixPanel: React.FC<SacMatrixPanelProps> = ({ onTransmitirClav
               Protocolo de radiocomunicaciones y despacho táctico por bloques minerales.
             </p>
           </div>
-          <div className="text-xs font-mono text-slate-500">
-            {clavesFiltradas.length} de {SAC_MATRIX.length} claves
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => tacticalAudio.testVoice()}
+              className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 text-amber-300 border border-slate-800 hover:border-amber-500/40 rounded text-[11px] font-mono flex items-center gap-1.5 transition-colors"
+              title="Escuchar prueba de voz táctica masculina neutra"
+            >
+              <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+              <span>Voz: Masculina Neutro</span>
+            </button>
+            <div className="text-xs font-mono text-slate-500 hidden sm:block">
+              {clavesFiltradas.length} de {SAC_MATRIX.length} claves
+            </div>
           </div>
         </div>
 

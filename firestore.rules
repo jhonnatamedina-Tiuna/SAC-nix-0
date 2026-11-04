@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidDespacho(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.indicativo is string && data.indicativo.size() <= 50
+        && data.claveSac is string && data.claveSac.size() <= 10
+        && (data.tiempoRespuestaMin is number || data.tiempoRespuestaMin is int)
+        && data.tiempoRespuestaMin >= 0 && data.tiempoRespuestaMin <= 120
+        && (data.prioridad is number || data.prioridad is int)
+        && data.prioridad >= 1 && data.prioridad <= 5
+        && data.timestamp is string && data.timestamp.size() <= 50;
+    }
+
+    function isValidEvento(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.codigoSac is string && data.codigoSac.size() <= 10
+        && data.mineral is string && data.mineral.size() <= 20
+        && data.unidadId is string && data.unidadId.size() <= 50
+        && data.timestamp is string && data.timestamp.size() <= 50;
+    }
+
+    function isValidAuditoria(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.ipOrigen is string && data.ipOrigen.size() <= 45
+        && data.endpoint is string && data.endpoint.size() <= 120
+        && data.metodo is string && data.metodo.size() <= 10
+        && data.motivo is string && data.motivo.size() <= 255
+        && data.timestamp is string && data.timestamp.size() <= 50;
+    }
+
+    function isValidLog(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.tipo is string && data.tipo.size() <= 30
+        && data.mensaje is string && data.mensaje.size() <= 500
+        && data.nivel is string && data.nivel.size() <= 20
+        && data.timestamp is string && data.timestamp.size() <= 50;
+    }
+
+    // Despachos de emergencia
+    match /despachos/{despachoId} {
+      allow read: if true;
+      allow create: if isValidId(despachoId) && isValidDespacho(request.resource.data);
+      allow update: if isValidId(despachoId) && isValidDespacho(request.resource.data);
+      allow delete: if false;
+    }
+
+    // Eventos y métricas SAC
+    match /eventos_sac/{eventoId} {
+      allow read: if true;
+      allow create: if isValidId(eventoId) && isValidEvento(request.resource.data);
+      allow update: if isValidId(eventoId) && isValidEvento(request.resource.data);
+      allow delete: if false;
+    }
+
+    // Auditoría de Seguridad y accesos denegados
+    match /auditoria_seguridad/{auditoriaId} {
+      allow read: if true;
+      allow create: if isValidId(auditoriaId) && isValidAuditoria(request.resource.data);
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Logs operacionales del sistema Ónix-0
+    match /logs_sistema/{logId} {
+      allow read: if true;
+      allow create: if isValidId(logId) && isValidLog(request.resource.data);
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
