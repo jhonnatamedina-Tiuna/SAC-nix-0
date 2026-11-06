@@ -4,12 +4,10 @@ on:
   push:
     branches:
       - main
-      - master
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
-
     steps:
       - name: Clonar repositorio
         uses: actions/checkout@v4
@@ -19,14 +17,14 @@ jobs:
         with:
           node-version: 18
 
-      - name: Configurar Java (JDK 17)
+      - name: Configurar Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-     - name: Instalar dependencias forzadas
-        run: npm install --force
+      - name: Instalar dependencias
+        run: npm install --legacy-peer-deps
 
       - name: Subir artefacto
         uses: actions/upload-artifact@v4
