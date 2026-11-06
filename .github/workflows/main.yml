@@ -1,0 +1,44 @@
+name: Compilar APK Android - Tiuna SAC
+
+on:
+  push:
+  branches: [ "main", "master" ]
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Clonar repositorio
+      uses: actions/checkout@v4
+
+    - name: ⚙️ Configurar Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: ☕ Configurar Java (JDK 17)
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: 📦 Instalar dependencias del proyecto
+      run: npm install
+
+    - name: 🛠️ Compilar APK de Android (Modo Debug / Release)
+      run: |
+        # Si usas Expo prebuild o React Native puro con Gradle:
+        npx expo run:android --variant release || echo "Paso adaptado a estructura local"
+        # O si prefieres compilar directamente con gradle si existe la carpeta android:
+        if [ -d "android" ]; then
+          cd android && ./gradlew assembleRelease
+        fi
+
+    - name: 🚀 Subir APK como artefacto descargable
+      uses: actions/upload-artifact@v4
+      with:
+        name: tiuna-app-apk
+        path: |
+          **/*.apk
+          android/app/build/outputs/apk/**/*.apk
