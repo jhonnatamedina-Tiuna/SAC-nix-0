@@ -4,7 +4,7 @@ import { UNIDADES_INICIALES, CANALES_PTT_DISPONIBLES } from './data/tacticalUnit
 import { IPS_BLOQUEADAS_INICIALES } from './data/networkRules';
 import { MAPEO_CANALES_PTT, SAC_MATRIX } from './data/sacMatrix';
 import { tacticalAudio } from './utils/audio';
-import { calcularDistanciaMetros, encontrarUnidadMasCercana } from './utils/geo';
+import { encontrarUnidadMasCercana } from './utils/geo';
 
 // Componentes
 import { TacticalMap } from './components/TacticalMap';
@@ -26,7 +26,7 @@ import './lib/firebase';
 import { persistirLogSistemaFirestore } from './services/firestoreService';
 
 // Iconos
-import { Map, Shield, Radio, Terminal, Smartphone, FileCode, AlertTriangle, Activity, Bell, BarChart3, Cloud, HardDrive } from 'lucide-react';
+import { Activity, Smartphone, HardDrive } from 'lucide-react';
 
 type TabView = 'C4ISR_CONSOLA' | 'ANALITICA_DESPACHO' | 'APP_VOLUNTARIOS' | 'MATRIZ_SAC' | 'RADIO_PTT' | 'GOOGLE_DRIVE' | 'CIBERDEFENSA' | 'TELEGRAM_BOT' | 'TERMINAL_MOVIL' | 'SCRIPTS_BACKEND';
 
@@ -65,7 +65,6 @@ export default function App() {
 
   // Manejar transmisión de clave SAC desde cualquier panel
   const handleTransmitirClave = (c: SacCode) => {
-    // Persistir log del sistema en Firebase Firestore
     persistirLogSistemaFirestore({
       id: crypto.randomUUID(),
       tipo: 'SAC_TRANSMISION',
@@ -75,7 +74,6 @@ export default function App() {
       timestamp: new Date().toISOString()
     }).catch(() => {});
 
-    // Si la clave es de Cobalto (CB-80..86), conmutar canal PTT y actualizar estado de Cobalto-1
     if (c.cambioCanalPtt && MAPEO_CANALES_PTT[c.codigo]) {
       const mapeo = MAPEO_CANALES_PTT[c.codigo];
       const canalEncontrado = CANALES_PTT_DISPONIBLES.find(item => item.id === mapeo.canalId);
@@ -88,11 +86,9 @@ export default function App() {
       );
     }
 
-    // Si es alerta de máxima prioridad (P1), disparar alarma y mensaje push
     if (c.prioridad === 1) {
       tacticalAudio.playCriticalAlertChime();
 
-      // Calcular unidad sugerida PostGIS
       const refLat = incidenteActivo ? incidenteActivo.lat : 10.4900;
       const refLon = incidenteActivo ? incidenteActivo.lon : -66.8900;
       const masCercana = encontrarUnidadMasCercana(refLat, refLon, unidades, 'AMBULANCIA');
@@ -113,7 +109,6 @@ export default function App() {
 
       setAlertaCriticaActiva(nuevaAlerta);
 
-      // Notificar a canal Telegram (LISTEN/NOTIFY)
       const telegramAlertMsg: TelegramMessage = {
         id: crypto.randomUUID(),
         remitente: 'BOT_TIUNA',
@@ -133,14 +128,12 @@ export default function App() {
     }
   };
 
-  // Despacho de unidad a un incidente
   const handleDespacharUnidad = (
     indicativo: string,
     nuevoEstado: string,
     destinoLat: number,
     destinoLon: number
   ) => {
-    // Persistir log de despacho en Firestore
     persistirLogSistemaFirestore({
       id: crypto.randomUUID(),
       tipo: 'DESPACHO_UNIDAD',
@@ -167,7 +160,6 @@ export default function App() {
       })
     );
 
-    // Cambiar PTT a canal táctico 1
     const canalTactico = CANALES_PTT_DISPONIBLES.find(c => c.id === 'CANAL_TACTICO_1');
     if (canalTactico) {
       setCanalPttActivo(canalTactico);
@@ -177,7 +169,6 @@ export default function App() {
       setAlertaCriticaActiva(prev => (prev ? { ...prev, atendida: true } : null));
     }
 
-    // Notificación en Telegram
     const msg: TelegramMessage = {
       id: crypto.randomUUID(),
       remitente: 'BOT_TIUNA',
@@ -188,9 +179,7 @@ export default function App() {
     setMensajesTelegram(prev => [...prev, msg]);
   };
 
-  // Notificación de Firewall Drop tras 5 fallos
   const handleAlertaDrop = (ip: string, motivo: string, fallos: number) => {
-    // Persistir log de ciberseguridad en Firestore
     persistirLogSistemaFirestore({
       id: crypto.randomUUID(),
       tipo: 'FIREWALL_DROP',
@@ -216,7 +205,6 @@ export default function App() {
     setMensajesTelegram(prev => [...prev, dropMsg]);
   };
 
-  // Desbloqueo de IP
   const handleDesbloquearIp = (ip: string) => {
     setIpsBloqueadas(prev => prev.filter(item => item.ip !== ip));
     tacticalAudio.playRogerBeep();
@@ -230,7 +218,6 @@ export default function App() {
     }).catch(() => {});
   };
 
-  // Procesar ráfaga offline entregada a Ónix-0
   const handleSyncRafaga = (paquetes: OfflineQueueItem[]) => {
     persistirLogSistemaFirestore({
       id: crypto.randomUUID(),
@@ -251,19 +238,20 @@ export default function App() {
     setMensajesTelegram(prev => [...prev, syncMsg]);
   };
 
+  // Si el boot screen está activo, se muestra exclusivamente a pantalla completa
+  if (mostrarBootScreen) {
+    return <TacticalBootScreen onComplete={() => setMostrarBootScreen(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans">
-      {/* ============================================================== */}
-      {/* STRICT TOP BAR CONTRACT (§2): 3 Zones separated by gap-8       */}
-      {/* ============================================================== */}
       <header 
         style={{ backgroundColor: '#090d16', zIndex: 100 }}
-        className="flex items-center justify-between gap-8 px-6 py-3.5 border-b border-slate-800 sticky top-0 shadow-2xl bg-[#090d16] backdrop-blur-none"
+        className="flex items-center justify-between gap-8 px-6 py-3.5 border-b border-slate-800 sticky top-0 shadow-2xl bg-[#090d16]"
       >
-        {/* Zona 1: Wordmark limpio con insignia oficial institucional */}
         <div className="flex items-center gap-2.5 whitespace-nowrap shrink-0">
           <img
-            src="/assets/aistudio/Tiuna_Capital_Nativo_1920_8bfdc104.png"
+            src={`${import.meta.env.BASE_URL}insignia-tiuna.png`}
             alt="Insignia Fundación de Rescate Tiuna"
             className="w-8 h-8 rounded-full object-contain border border-amber-500/50 bg-slate-950 p-0.5 shadow-sm"
           />
@@ -274,7 +262,6 @@ export default function App() {
           <span className="text-xs text-amber-400 font-mono">C4ISR Central</span>
         </div>
 
-        {/* Zona 2: Enlaces de navegación táctica concisos */}
         <nav className="hidden lg:flex items-center gap-5 text-xs font-medium text-slate-400">
           <button
             onClick={() => setTabActiva('C4ISR_CONSOLA')}
@@ -360,7 +347,6 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Zona 3: Acciones primarias y botón de instalación nativo */}
         <div className="flex items-center gap-3 shrink-0">
           <PWAInstallButton />
           <button
@@ -377,7 +363,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Selector móvil de vistas (en pantallas estrechas) */}
+      {/* Selector móvil de vistas */}
       <div 
         style={{ backgroundColor: '#090d16', zIndex: 99 }}
         className="lg:hidden border-b border-slate-800 px-4 py-2 flex items-center gap-2 overflow-x-auto scrollbar-none text-xs bg-[#090d16] sticky top-[61px] shadow-md"
@@ -406,9 +392,7 @@ export default function App() {
         ))}
       </div>
 
-      {/* Contenido Principal */}
       <main className="flex-1 p-4 md:p-6 max-w-[1720px] w-full mx-auto flex flex-col">
-        {/* Banner de Emergencia Crítica HUD */}
         <EmergencyAlertBanner
           alerta={alertaCriticaActiva}
           onDespachar={(indicativo) => {
@@ -424,10 +408,8 @@ export default function App() {
           onCerrar={() => setAlertaCriticaActiva(null)}
         />
 
-        {/* Vista 1: Consola C4ISR Maestro Unificada */}
         {tabActiva === 'C4ISR_CONSOLA' && (
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 flex-1">
-            {/* Columna Izquierda: Mapa Táctico PostGIS + Telemetría de Unidades (7 cols) */}
             <div className="xl:col-span-7 flex flex-col gap-6">
               <div className="h-[520px]">
                 <TacticalMap
@@ -451,7 +433,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Tira de Unidades Tácticas en Servicio */}
               <div className="bg-[#0f172a] rounded-xl border border-slate-800 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
@@ -462,27 +443,23 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {unidades.map(u => {
-                    const isBase = u.tipo === 'BASE';
-                    return (
-                      <div key={u.indicativo} className="bg-slate-950 p-3 rounded-lg border border-slate-850 text-xs font-mono">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-white text-sm">{u.indicativo}</span>
-                          <span className="text-amber-400 font-bold">{u.estadoSac}</span>
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-1">{u.operador}</div>
-                        <div className="text-[10px] text-slate-500 mt-2 flex items-center justify-between">
-                          <span>{u.canalPttActual}</span>
-                          <span>Bat: {u.bateria}%</span>
-                        </div>
+                  {unidades.map(u => (
+                    <div key={u.indicativo} className="bg-slate-950 p-3 rounded-lg border border-slate-850 text-xs font-mono">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white text-sm">{u.indicativo}</span>
+                        <span className="text-amber-400 font-bold">{u.estadoSac}</span>
                       </div>
-                    );
-                  })}
+                      <div className="text-[11px] text-slate-400 mt-1">{u.operador}</div>
+                      <div className="text-[10px] text-slate-500 mt-2 flex items-center justify-between">
+                        <span>{u.canalPttActual}</span>
+                        <span>Bat: {u.bateria}%</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
 
-            {/* Columna Derecha: Radio PTT + Matriz SAC Compacta (5 cols) */}
             <div className="xl:col-span-5 flex flex-col gap-6">
               <div className="h-[430px]">
                 <PttConsole
@@ -500,7 +477,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Vista: App Móvil para Voluntarios de Campo (Gama Baja Android e iOS) */}
         {tabActiva === 'APP_VOLUNTARIOS' && (
           <div className="pb-8">
             <VoluntarioMobileTerminal
@@ -526,21 +502,18 @@ export default function App() {
           </div>
         )}
 
-        {/* Vista: Analítica de Despacho 24h (Recharts) */}
         {tabActiva === 'ANALITICA_DESPACHO' && (
           <div className="h-[750px]">
             <DispatchAnalyticsPanel unidades={unidades} />
           </div>
         )}
 
-        {/* Vista 2: Matriz SAC 01-99 Completa */}
         {tabActiva === 'MATRIZ_SAC' && (
           <div className="h-[800px]">
             <SacMatrixPanel onTransmitirClave={handleTransmitirClave} />
           </div>
         )}
 
-        {/* Vista 3: Radio PTT Transceiver */}
         {tabActiva === 'RADIO_PTT' && (
           <div className="max-w-3xl mx-auto w-full h-[650px]">
             <PttConsole
@@ -552,7 +525,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Vista: Google Drive Táctico */}
         {tabActiva === 'GOOGLE_DRIVE' && (
           <div className="h-[750px]">
             <GoogleDrivePanel
@@ -570,7 +542,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Vista 4: Ciberdefensa y Firewall */}
         {tabActiva === 'CIBERDEFENSA' && (
           <div className="h-[750px]">
             <CyberDefensePanel
@@ -581,7 +552,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Vista 5: Bot de Telegram */}
         {tabActiva === 'TELEGRAM_BOT' && (
           <div className="max-w-4xl mx-auto w-full h-[700px]">
             <TelegramConsole
@@ -594,14 +564,12 @@ export default function App() {
           </div>
         )}
 
-        {/* Vista 6: Motor Offline Móvil */}
         {tabActiva === 'TERMINAL_MOVIL' && (
           <div className="h-[750px]">
             <MobileTerminalSim onSyncRafaga={handleSyncRafaga} />
           </div>
         )}
 
-        {/* Vista 7: Inspector de Scripts Backend */}
         {tabActiva === 'SCRIPTS_BACKEND' && (
           <div className="h-[750px]">
             <BackendCodeViewer />
@@ -609,11 +577,10 @@ export default function App() {
         )}
       </main>
 
-      {/* Pie de página con sello institucional del Grupo Tiuna */}
       <footer className="px-6 py-4 bg-slate-950 border-t border-slate-900 text-xs text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <img
-            src="/assets/aistudio/Tiuna_Capital_Nativo_1920_8bfdc104.png"
+            src={`${import.meta.env.BASE_URL}insignia-tiuna.png`}
             alt="Logo Fundación de Rescate Tiuna"
             className="w-6 h-6 rounded-full object-contain border border-slate-800"
           />
@@ -637,11 +604,6 @@ export default function App() {
           <span>Matriz SAC v2.4 (QZ·GR·AM·DM·CB·NX)</span>
         </div>
       </footer>
-
-      {/* Bootscreen Táctico de Inicialización (Splash) */}
-      {mostrarBootScreen && (
-        <TacticalBootScreen onComplete={() => setMostrarBootScreen(false)} />
-      )}
     </div>
   );
 }
