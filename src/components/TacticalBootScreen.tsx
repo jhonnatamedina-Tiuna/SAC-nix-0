@@ -40,7 +40,6 @@ export const TacticalBootScreen: React.FC<TacticalBootScreenProps> = ({ onComple
             alt="Insignia Grupo de Rescate Tiuna"
             className="w-20 h-20 object-contain drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]"
             onError={(e) => {
-              // Fallback visual en caso de que la imagen tarde en cargar
               (e.target as HTMLElement).style.display = 'none';
             }}
           />
@@ -67,13 +66,13 @@ export const TacticalBootScreen: React.FC<TacticalBootScreenProps> = ({ onComple
           <span>100% CARGADO</span>
         </div>
 
-        {/* Caja de Terminal Log */}
+        {/* Caja de Terminal Log con caracteres seguros para TSX */}
         <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded p-3 mt-5 text-left shadow-inner">
           <p className="text-[10px] text-slate-500 border-b border-slate-800 pb-1 mb-1 font-semibold">
-            >_ TERMINAL LOG TIUNA-OS v2.4
+            {'>'}_ TERMINAL LOG TIUNA-OS v2.4
           </p>
           <p className="text-[11px] text-emerald-400/90 font-mono">
-            > Cargando núcleo C4ISR Grupo de Rescate Tiuna v2.4... Conectado a Red Táctica.
+            {'>'} Cargando núcleo C4ISR Grupo de Rescate Tiuna v2.4... Conectado a Red Táctica.
           </p>
         </div>
       </div>
